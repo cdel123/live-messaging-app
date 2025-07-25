@@ -1,35 +1,22 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
 import mongoose from 'mongoose';
+import userRoutes from './routes/userRoute.js';
+import chatRoutes from './routes/chatRoute.js';
+import messageRoutes from './routes/messageRoute.js';
 
 dotenv.config();
 const app = express();
-
-// Middleware
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
-app.use(cookieParser());
 
-// Test route
-app.get('/', (req, res) => {
-    res.send('API is running...');
-});
-const connectDB = async () => {
-    try {
-        await mongoose.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-        console.log('MongoDB Connected...');
-    } catch (error) {
-        console.error(`Error: ${error.message}`);
-        process.exit(1);
-    }
-};
+app.use('/api/users', userRoutes);
+app.use('/api/chats', chatRoutes);
+app.use('/api/messages', messageRoutes);
 
-connectDB();
-// Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
+    app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+  })
+  .catch((err) => console.error('MongoDB connection error:', err));
