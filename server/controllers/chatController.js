@@ -1,7 +1,8 @@
-import Chat from "../models/chat.js";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import Chat from '../models/chat.js';
+import User from '../models/user.js';
 
+// POST /api/chats
+// Create or fetch a one-on-one chat
 export const newChat = async (req, res) => {
   const { userId } = req.body;
 
@@ -67,26 +68,74 @@ export const getChats = async (req, res) => {
   }
 };
 
+// POST /api/chats/group
+// Create a new group chat
 export const createGroupChat = async (req, res) => {
-  const { chatName, users } = req.body;
+  if (!req.body.users || !req.body.name) {
+    return res.status(400).send({ message: 'Please fill all the fields' });
+  }
 
-  if (!chatName || !users || users.length < 2) {
-    return res.status(400).send({
-      message: 'Please fill all the fields and select at least 2 users',
-    });
+  var users = JSON.parse(req.body.users);
+
+  if (users.length < 2) {
+    return res
+      .status(400)
+      .send('More than 2 users are required to form a group chat');
   }
-  else{
-    var grpChatData={
-      chatName,
-      users: JSON.parse(users),
+
+  users.push(req.user);
+
+  try {
+    const groupChat = await Chat.create({
+      chatName: req.body.name,
+      users: users,
       isGroupChat: true,
-      groupAdmin: req.user._id,
-    }    
-    try{
-      const createdChat= await Chat.create(grpChatData);
-      const FullChat = await Chat.findOne({ _id: createdChat._id })
-        .populate('users', '-password')
-        .populate('groupAdmin', '-password');
-    }
+      groupAdmin: req.user,
+    });
+
+    const fullGroupChat = await Chat.findOne({ _id: groupChat._id })
+      .populate('users', '-password')
+      .populate('groupAdmin', '-password');
+
+    res.status(200).json(fullGroupChat);
+  } catch (error) {
+    res.status(400).send({ message: error.message });
   }
-}
+};
+
+// DELETE /api/chats/:chatId
+export const deleteChat = async (req, res) => {
+    try {
+        const chat = await Chat.findByIdAndDelete(req.params.chatId);
+        if (!chat) {
+            return res.status(404).send({ message: 'Chat not found' });
+        }
+        res.status(200).send({ message: 'Chat deleted successfully' });
+    } catch (error) {
+        res.status(400).send({ message: error.message });
+    }
+};
+
+
+// PUT /api/chats/group-remove
+export const removeFromGroup = async (req, res) => {
+  const { chatId, userId } = req.body;
+
+  const removed = await Chat.findByIdAndUpdate(
+    chatId,
+    {
+      $pull: { users: userId },
+    },
+    {
+      new: true,
+    }
+  )
+    .populate('users', '-password')
+    .populate('groupAdmin', '-password');
+
+  if (!removed) {
+    res.status(404).send({ message: 'Chat Not Found' });
+  } else {
+    res.json(removed);
+  }
+};
